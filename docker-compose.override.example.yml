@@ -1,0 +1,93 @@
+# EXAMPLE: copy to `docker-compose.override.yml` (gitignored) and edit.
+#
+# Here you mount your projects, pick plugins/MCPs and define the entrypoint
+# that runs the idempotent Claude Code bootstrap inside the container.
+#
+# Things to edit:
+#   1. volumes: replace the example paths with the absolute paths of YOUR projects
+#   2. permissions.additionalDirectories: list the mounts that Claude can access
+#   3. enabledPlugins: adjust the list to your stack
+#   4. for p in ...: keep it in sync with enabledPlugins
+#   5. (optional) uncomment `claude mcp add context7 ...` or add other MCPs
+
+services:
+  sandbox:
+    image: vibe-sandbox:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox.override
+    volumes:
+      # Volume that persists ~/.claude (sessions, installed plugins, etc.).
+      - sandbox-home:/home/sandbox
+
+      # Mount your projects here. Use absolute paths.
+      # - /Users/YOUR_USER/path/to/main-project:/workspace
+      # - /Users/YOUR_USER/path/to/sibling-project:/workspace/sibling
+
+      # (optional) project-local screenshots/temp dir
+      # - ./.sandbox:/workspace/.sandbox:ro
+
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        set -o pipefail
+
+        mkdir -p ~/.claude
+        cat > ~/.claude/settings.json << 'EOF'
+        {
+          "permissions": {
+            "additionalDirectories": [
+              "/workspace"
+            ]
+          },
+          "enabledPlugins": {
+            "security-guidance@claude-plugins-official": true,
+            "commit-commands@claude-plugins-official": true,
+            "code-review@claude-plugins-official": true,
+            "pr-review-toolkit@claude-plugins-official": true,
+            "claude-md-management@claude-plugins-official": true,
+            "hookify@claude-plugins-official": true,
+            "feature-dev@claude-plugins-official": true,
+            "superpowers@superpowers-dev": true
+          }
+        }
+        EOF
+
+        if [ ! -f ~/.claude/.bootstrap-v1 ]; then
+          BOOT_LOG=/tmp/sandbox-bootstrap.log
+          : > "$$BOOT_LOG"
+          echo "[sandbox] First run: installing marketplaces, plugins and MCPs..."
+
+          claude plugin marketplace add obra/superpowers 2>&1 | tee -a "$$BOOT_LOG" | tail -1
+
+          for p in \
+            "security-guidance@claude-plugins-official" \
+            "commit-commands@claude-plugins-official" \
+            "code-review@claude-plugins-official" \
+            "pr-review-toolkit@claude-plugins-official" \
+            "claude-md-management@claude-plugins-official" \
+            "hookify@claude-plugins-official" \
+            "feature-dev@claude-plugins-official" \
+            "superpowers@superpowers-dev"; do
+            echo "[sandbox] install: $$p"
+            claude plugin install "$$p" 2>&1 | tee -a "$$BOOT_LOG" | tail -1
+          done
+
+          # Optional MCPs — uncomment any you want:
+          # claude mcp add context7 --scope user --transport http https://mcp.context7.com/mcp 2>&1 | tee -a "$$BOOT_LOG" | tail -1
+
+          touch ~/.claude/.bootstrap-v1
+          echo "[sandbox] Bootstrap done. Log at $$BOOT_LOG"
+        fi
+
+        if [ -t 0 ]; then
+          exec claude --dangerously-skip-permissions
+        else
+          echo "[sandbox] No interactive TTY; exiting after bootstrap. Use 'docker compose ... run --rm sandbox' in a terminal."
+        fi
+    command: []
+
+volumes:
+  sandbox-home:

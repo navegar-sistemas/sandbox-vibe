@@ -1,0 +1,58 @@
+name: Feature request
+description: Suggest a new capability or enhancement for the template.
+title: "feat: <short summary>"
+labels: ["enhancement", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest an improvement. Describe the **problem first** — the proposed solution is secondary and may evolve in discussion.
+
+        Reminder: this template stays small on purpose. Anything specific to a single project, plugin, runtime, or stack belongs in the override layer (which is gitignored), not in the base. Requests that would make the base less generic are likely to be declined.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can't you do today, or what is unnecessarily painful?
+      placeholder: "When my override Dockerfile installs Bun, the bootstrap doesn't pick it up because ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed solution
+      description: How would you like this solved? Pseudocode or compose snippets are welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about and why you discarded them.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer should the change live in?
+      options:
+        - Base (affects every user — high bar)
+        - Override example (template only)
+        - Documentation
+        - CI / `.github/`
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Links, references, prior art, screenshots.
+    validations:
+      required: false

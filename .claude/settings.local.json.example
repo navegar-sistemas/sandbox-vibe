@@ -1,0 +1,9 @@
+{
+  "_README": "Copy to .claude/settings.local.json (gitignored) for personal overrides. Anything you put here is merged on top of settings.json (tracked). Use this for additional permissions you want only on your machine, ENV vars for local tooling, or tweaks to hooks. Do not add project-wide rules here — those go in settings.json so every contributor gets them.",
+  "permissions": {
+    "allow": [
+    ]
+  },
+  "env": {
+  }
+}

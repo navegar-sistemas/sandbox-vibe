@@ -1,0 +1,55 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose -f docker-compose.sandbox.yml config:*)",
+      "Bash(docker compose -f docker-compose.sandbox.yml -f docker-compose.override.yml config:*)",
+      "Bash(docker compose -f docker-compose.sandbox.yml -f docker-compose.override.example.yml config:*)",
+      "Bash(hadolint:*)",
+      "Bash(markdownlint-cli2:*)",
+      "Bash(gitleaks detect:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git remote -v)",
+      "Bash(git rev-parse:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh api repos/navegar-sistemas/vibe-sandbox:*)",
+      "Bash(gh api users/navegar-sistemas)",
+      "Bash(which:*)",
+      "Bash(grep:*)",
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre_base_edit_warn.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post_yml_validate.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/post_override_marker_check.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

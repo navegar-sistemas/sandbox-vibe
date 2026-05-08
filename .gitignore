@@ -1,0 +1,32 @@
+# --- vibe-sandbox: user-local files ---
+# Generated from the *.example files; contain personal paths/choices.
+docker-compose.override.yml
+Dockerfile.sandbox.override
+
+# Runtime dir for project screenshots/temp
+.sandbox/
+
+# Bootstrap logs (live in the container's /tmp, but in case a host ever copies them...)
+*.bootstrap.log
+sandbox-bootstrap.log
+
+# --- common ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+.env
+.env.local
+.env.*.local
+node_modules/
+.claude/worktrees/
+
+# CLI build artifacts (cli/ package)
+cli/dist/
+
+# Per-developer Claude Code overrides (personal allowlist, env vars, personal CLAUDE.md at the repo root).
+# Tracked counterparts (.claude/settings.json, .claude/CLAUDE.md) carry the project-wide rules.
+.claude/settings.local.json
+/CLAUDE.md
+user

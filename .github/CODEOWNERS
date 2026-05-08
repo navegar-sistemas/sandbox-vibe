@@ -1,0 +1,28 @@
+# Default owner for everything in the repo.
+# Lines starting with '#' are comments. Order matters — last matching pattern wins.
+
+* @navegar-sistemas
+
+# Workflows and CI configuration require extra scrutiny.
+/.github/workflows/   @navegar-sistemas
+/.github/dependabot.yml @navegar-sistemas
+
+# Hardened base files — changes here affect every user of the template.
+/Dockerfile.sandbox            @navegar-sistemas
+/docker-compose.sandbox.yml    @navegar-sistemas
+
+# AI-governance surfaces — files that define how a Claude Code agent is
+# allowed to act in this repository. Because these files are editable by
+# the agent itself, owner review is the load-bearing defense. See
+# SECURITY.md "Threat model boundary".
+/.claude/CLAUDE.md             @navegar-sistemas
+/.claude/agents/               @navegar-sistemas
+/.claude/commands/             @navegar-sistemas
+/.claude/hooks/                @navegar-sistemas
+/.claude/settings.json         @navegar-sistemas
+
+# Lint and validation configuration — relaxing these silently undermines
+# the warnings-as-errors rule declared in .claude/CLAUDE.md.
+/.hadolint.yaml                @navegar-sistemas
+/.markdownlint.jsonc           @navegar-sistemas
+/.editorconfig                 @navegar-sistemas

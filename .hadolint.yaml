@@ -1,0 +1,19 @@
+# Treat warnings as failures, consistent with the repository-wide rule
+# that warnings constitute defects of the same severity as errors
+# (see .claude/CLAUDE.md, "Warnings constitute defects").
+failure-threshold: warning
+
+ignored:
+  # DL3008 (pin apt versions): not enforced. The base image tracks
+  # Debian-slim's APT cache; pinning every apt-get install would require
+  # a coordinated upgrade workflow that is not justified for a template
+  # whose explicit purpose is to be cloned, customized, and re-built
+  # frequently. This is the only ignored rule; all others are enforced
+  # at warning severity or above.
+  - DL3008
+
+override:
+  warning:
+    - DL3007
+    - DL3015
+    - DL3009

@@ -1,0 +1,113 @@
+name: Bug report
+description: Something in the template is broken or behaves unexpectedly.
+title: "bug: <short summary>"
+labels: ["bug", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please complete every section so a maintainer can reproduce the issue without follow-up questions.
+
+        Before opening, please confirm:
+        - You are on the latest `main` (or the latest tagged release).
+        - You have searched existing issues and discussions for the same problem.
+        - This is not a security issue (those go through a private advisory — see SECURITY.md).
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing what is broken.
+      placeholder: "Bootstrap marker is touched even when claude plugin install fails."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Exact commands and file changes. A maintainer should be able to copy-paste and reproduce.
+      value: |
+        1. `cp Dockerfile.sandbox.override.example Dockerfile.sandbox.override`
+        2. `cp docker-compose.override.example.yml docker-compose.override.yml`
+        3. Edit `docker-compose.override.yml` to ...
+        4. Run `docker compose -f docker-compose.sandbox.yml -f docker-compose.override.yml run --rm sandbox`
+        5. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: "I expected the marker to NOT be created when a plugin install fails."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: "The marker was created and subsequent runs skipped the bootstrap entirely."
+    validations:
+      required: true
+
+  - type: input
+    id: docker-version
+    attributes:
+      label: Docker version
+      description: Output of `docker --version`
+      placeholder: "Docker version 27.3.1, build ce12230"
+    validations:
+      required: true
+
+  - type: input
+    id: compose-version
+    attributes:
+      label: Docker Compose version
+      description: Output of `docker compose version`
+      placeholder: "Docker Compose version v2.30.3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: host-os
+    attributes:
+      label: Host OS
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (Ubuntu / Debian)
+        - Linux (Fedora / RHEL / CentOS)
+        - Linux (Arch / other)
+        - Windows (WSL2)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: claude-code-version
+    attributes:
+      label: Claude Code version (inside the container)
+      description: Output of `claude --version` inside the running sandbox.
+      placeholder: "claude-code 1.2.3"
+    validations:
+      required: false
+
+  - type: textarea
+    id: bootstrap-log
+    attributes:
+      label: Relevant excerpt from `/tmp/sandbox-bootstrap.log`
+      description: Paste the lines around the failure. Redact any tokens or paths you don't want public.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Anything else that might help — workarounds tried, screenshots, related issues.
+    validations:
+      required: false

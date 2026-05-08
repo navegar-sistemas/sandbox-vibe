@@ -1,0 +1,58 @@
+# EXAMPLE: copy to `Dockerfile.sandbox.override` (gitignored) and edit.
+#
+# This layer extends the base with:
+#   - npm bumped to latest (silences the "npm notice")
+#   - Claude Code latest
+#   - (optional) language servers / runtimes for your stack
+#
+# Comment/uncomment blocks according to your stack.
+
+FROM vibe-sandbox-base:latest
+
+USER root
+
+# === Always: npm + Claude Code ===
+RUN npm install -g npm@latest \
+ && npm install -g @anthropic-ai/claude-code@latest
+
+# === Optional: PHP (intelephense for the php-lsp plugin) ===
+# RUN npm install -g intelephense
+
+# === Optional: C# / .NET (csharp-ls for the csharp-lsp plugin) ===
+# RUN apt-get update \
+#  && apt-get install -y --no-install-recommends wget ca-certificates libicu72 \
+#  && rm -rf /var/lib/apt/lists/* \
+#  && wget -qO /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh \
+#  && chmod +x /tmp/dotnet-install.sh \
+#  && /tmp/dotnet-install.sh --channel 10.0 --install-dir /usr/share/dotnet \
+#  && ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet \
+#  && rm /tmp/dotnet-install.sh \
+#  && DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+#     dotnet tool install --tool-path /usr/local/bin csharp-ls
+
+# === Optional: Python (pip + pyright for the pyright-lsp plugin) ===
+# RUN apt-get update \
+#  && apt-get install -y --no-install-recommends python3-pip \
+#  && rm -rf /var/lib/apt/lists/* \
+#  && npm install -g pyright
+
+# === Optional: Go (gopls for the gopls-lsp plugin) ===
+# RUN apt-get update \
+#  && apt-get install -y --no-install-recommends golang-go \
+#  && rm -rf /var/lib/apt/lists/* \
+#  && go install golang.org/x/tools/gopls@latest
+
+# === Optional: Rust (rust-analyzer for the rust-analyzer-lsp plugin) ===
+# RUN apt-get update \
+#  && apt-get install -y --no-install-recommends rustup \
+#  && rm -rf /var/lib/apt/lists/* \
+#  && rustup-init -y --default-toolchain stable \
+#  && /root/.cargo/bin/rustup component add rust-analyzer
+
+USER sandbox
+
+# Useful env vars when .NET is installed (silences extra noise).
+# Keeping them without .NET causes no side effect.
+ENV DOTNET_NOLOGO=1 \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_ROOT=/usr/share/dotnet

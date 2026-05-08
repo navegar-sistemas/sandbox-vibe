@@ -15,6 +15,7 @@ Run each in sequence. Do not skip on first failure — collect all results.
    Any warning emitted by buildkit constitutes a build defect; the smoke test must FAIL if buildkit emits a warning, regardless of the build's exit code. Note the final image size.
 
 2. **Tools on PATH** — required runtimes/utilities are reachable from the default user:
+
    ```bash
    docker run --rm --entrypoint bash vibe-sandbox-base:latest -c '
      set -e
@@ -24,15 +25,19 @@ Run each in sequence. Do not skip on first failure — collect all results.
      curl --version | head -n 1
    '
    ```
+
    Each command must print a non-empty version string.
 
 3. **Non-root user** — the container runs as `sandbox`, not root:
+
    ```bash
    docker run --rm --entrypoint bash vibe-sandbox-base:latest -c 'id -un'
    ```
+
    Output must equal `sandbox`. Anything else is a regression.
 
 4. **Security defaults applied at runtime** — when the container is invoked with the same flags `docker-compose.sandbox.yml` ships with:
+
    ```bash
    docker run --rm \
      --user 1000:1000 \
@@ -42,6 +47,7 @@ Run each in sequence. Do not skip on first failure — collect all results.
      vibe-sandbox-base:latest \
      bash -c 'cat /proc/self/status | grep -E "^(CapEff|NoNewPrivs)"'
    ```
+
    Required output:
    - `NoNewPrivs:` followed by `1`
    - `CapEff:` followed by `0000000000000000` (all 16 zeros — every capability dropped)
@@ -56,7 +62,7 @@ Run each in sequence. Do not skip on first failure — collect all results.
 
 Table of step / PASS or FAIL / observed value. If every step passes, print:
 
-```
+```text
 SMOKE OK — base image is functional and security-correct.
 Image: vibe-sandbox-base:latest
 Size : <size>

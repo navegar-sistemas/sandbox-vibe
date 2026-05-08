@@ -75,7 +75,7 @@ If reviewing a commit range, for every commit message:
 
 ## Output format
 
-```
+```text
 ## Findings (N)
 
 1. [BLOCK] file:line — <problem>. Fix: <action>.
@@ -91,7 +91,7 @@ If reviewing a commit range, for every commit message:
 
 If zero findings:
 
-```
+```text
 ## Findings (0)
 
 No issues detected.

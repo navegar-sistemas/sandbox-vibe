@@ -20,7 +20,7 @@ When you let an AI agent edit your code, three things must hold at the same time
 
 ## Layout
 
-```
+```text
 vibe-sandbox/
 ├── Dockerfile.sandbox                   # minimal base, tracked
 ├── docker-compose.sandbox.yml           # limits + base, tracked
@@ -52,6 +52,8 @@ npx @navegar-sistemas/vibe-sandbox up        # builds + runs the Claude REPL
 The wizard asks for the workspace path, optional sibling mounts, stack (PHP / .NET / Python / Go / Rust LSP support), plugins, MCP servers, and resource limits. It writes the four sandbox files plus a `config.json` to `.vibe-sandbox/` in the project root and updates `.gitignore` accordingly.
 
 Bootstrap is idempotent via a content-derived hash marker — changing the plugin or MCP list automatically triggers a re-bootstrap on the next `up`. To force a re-bootstrap without changing the config, run `npx @navegar-sistemas/vibe-sandbox bump-marker` and then `up`.
+
+The Claude home volume is **per-project**: it is prefixed with a slug derived from the workspace directory basename (for example, `myproject-sandbox-home`). Two different host projects therefore do not share Claude sessions, marketplace tokens, or installed plugins. Renaming the workspace directory will create a new volume and trigger a fresh bootstrap.
 
 The CLI lives in [`cli/`](cli/) and is published as [`@navegar-sistemas/vibe-sandbox`](https://www.npmjs.com/package/@navegar-sistemas/vibe-sandbox) on npm. Source code, dependencies, and build configuration are all in that subdirectory.
 
@@ -133,7 +135,7 @@ The first run executes the bootstrap (installs marketplaces, plugins and MCPs in
 Each Claude Code LSP plugin needs its corresponding binary on the container's `PATH`. `Dockerfile.sandbox.override.example` already has commented blocks — uncomment the one for your stack:
 
 | Stack | Plugin | Binary on PATH |
-|---|---|---|
+| --- | --- | --- |
 | PHP | `php-lsp` | `intelephense` (npm) |
 | C# / .NET | `csharp-lsp` | `csharp-ls` (dotnet tool) |
 | Python | `pyright-lsp` | `pyright` (npm) |
@@ -207,18 +209,23 @@ The override entrypoint is an inline bash script with 3 phases:
 ## Troubleshooting
 
 ### "warning: skip creation of /usr/share/man/man1/...lzma..."
+
 Comes from `xz-utils` on slim images without man pages. The `vibe-sandbox` base **does not** install `xz-utils` for that reason. If you added it in the override, the warning must be eliminated by creating `/usr/share/man/man1/` before the `apt-get install`. The repository treats warnings as defects of the same severity as errors; accepting or suppressing the warning is not a valid resolution.
 
 ### "The variable is not set. Defaulting to a blank string"
+
 Compose interpolates `$VAR` in YAML strings. If you added bash variables in the entrypoint, escape them with `$$VAR` (two dollar signs). Applies to `$p`, `$BOOT_LOG`, any bash variable that appears inside a YAML string.
 
 ### "Tool 'csharp-ls' failed to install... DotnetToolSettings.xml"
+
 The current `csharp-ls` version requires .NET 10+. If you uncommented the .NET block in `Dockerfile.override`, make sure you use `--channel 10.0` in `dotnet-install.sh` (not `8.0`).
 
 ### Bootstrap ran but plugins are missing
+
 Confirm that the plugin names in the `for p in ...` loop match the ones listed in `enabledPlugins`. Both must use the same `name@marketplace`.
 
 ### Bootstrap was "skipped" but I changed the list
+
 The marker `~/.claude/.bootstrap-v1` is recorded in the `sandbox-home` volume. Bump it to `bootstrap-v2` in the entrypoint, or delete it manually:
 
 ```bash
@@ -227,6 +234,7 @@ docker compose -f docker-compose.sandbox.yml -f docker-compose.override.yml run 
 ```
 
 ### The image is huge
+
 The .NET SDK 10 alone adds ~250 MB. If you only need `csharp-ls` at runtime, keep it; otherwise comment the block out. Other common dependencies (intelephense, pyright) are lightweight.
 
 ---

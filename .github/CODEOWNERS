@@ -26,3 +26,14 @@
 /.hadolint.yaml                @navegar-sistemas
 /.markdownlint.jsonc           @navegar-sistemas
 /.editorconfig                 @navegar-sistemas
+
+# CLI package surfaces. Templates render directly into containers that
+# downstream users execute; package.json controls the dependency graph
+# that lands on every user's machine; the build config decides what is
+# bundled. All require explicit owner review.
+/cli/package.json              @navegar-sistemas
+/cli/package-lock.json         @navegar-sistemas
+/cli/tsup.config.ts            @navegar-sistemas
+/cli/tsconfig.json             @navegar-sistemas
+/cli/templates/                @navegar-sistemas
+/cli/src/                      @navegar-sistemas

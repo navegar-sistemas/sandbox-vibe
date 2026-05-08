@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile, unlink, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Config, Stack } from "./config.js";
 
@@ -71,7 +71,17 @@ export async function writeRendered(
   outputName: string,
   content: string,
 ): Promise<void> {
-  await writeFile(join(destDir, outputName), content, "utf-8");
+  const target = join(destDir, outputName);
+  // Defense in depth: unlink any pre-existing entry first so a planted
+  // symlink at `target` cannot redirect the write into a host file.
+  // The directory itself is checked separately in `init`.
+  try {
+    await unlink(target);
+  } catch {
+    // ENOENT, EISDIR, or any other failure: writeFile below will surface
+    // a real problem with the path.
+  }
+  await writeFile(target, content, "utf-8");
 }
 
 export function computeMarker(config: Config): string {
@@ -82,13 +92,34 @@ export function computeMarker(config: Config): string {
       .map((m) => ({ name: m.name, transport: m.transport, url: m.url }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   });
-  const hash = createHash("sha256").update(canonical).digest("hex").slice(0, 8);
+  // 16 hex chars = 64 bits. Birthday collisions need ~5 billion configs;
+  // targeted preimage on truncated SHA-256 is computationally expensive
+  // enough that the marker is not a useful attack surface.
+  const hash = createHash("sha256").update(canonical).digest("hex").slice(0, 16);
   return `bootstrap-${hash}`;
 }
 
-export function renderVolumesBlock(config: Config): string {
+// Compose project name comes from the directory containing the YAML, which
+// is `.vibe-sandbox` for every consumer of this CLI. Without further
+// scoping, two unrelated projects would share the `sandbox-home` volume
+// and leak Claude sessions, marketplace tokens, and installed plugins
+// between them. The slug isolates volumes per workspace; a SHA-8 of the
+// absolute workspace path disambiguates two projects that happen to share
+// the same basename (e.g. `~/work/foo` vs `~/play/foo`).
+export function computeProjectSlug(config: Config): string {
+  const raw = basename(config.workspacePath).toLowerCase();
+  const cleaned = raw.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+  const safeBase = cleaned.length > 0 ? cleaned : "vibe";
+  const pathHash = createHash("sha256")
+    .update(config.workspacePath)
+    .digest("hex")
+    .slice(0, 8);
+  return `${safeBase}-${pathHash}`;
+}
+
+export function renderVolumesBlock(config: Config, projectSlug: string): string {
   const lines: string[] = [
-    "      - sandbox-home:/home/sandbox",
+    `      - ${projectSlug}-sandbox-home:/home/sandbox`,
     `      - ${config.workspacePath}:/workspace`,
   ];
   for (const m of config.additionalMounts) {
@@ -116,10 +147,14 @@ export function renderMarketplacesBlock(config: Config): string {
   if (config.marketplaces.length === 0) {
     return "";
   }
+  // Output of `claude plugin marketplace add` may include a clone URL with
+  // an embedded credential when the host has Git auth configured. Redirect
+  // to the (chmod-600) bootstrap log instead of teeing into the agent's
+  // stdout where the assistant could later read it via tool use.
   return config.marketplaces
     .map(
       (m) =>
-        `          claude plugin marketplace add ${m} 2>&1 | tee -a "$$BOOT_LOG" | tail -1`,
+        `          claude plugin marketplace add ${m} >>"$$BOOT_LOG" 2>&1`,
     )
     .join("\n");
 }
@@ -140,9 +175,11 @@ export function renderMcpsBlock(config: Config): string {
   if (config.mcps.length === 0) {
     return "";
   }
+  // MCP URLs can carry secrets in basic-auth or query parameters; redirect
+  // command output to the chmod-600 bootstrap log instead of teeing.
   const lines = config.mcps.map(
     (m) =>
-      `          claude mcp add ${m.name} --scope user --transport ${m.transport} ${m.url} 2>&1 | tee -a "$$BOOT_LOG" | tail -1`,
+      `          claude mcp add ${m.name} --scope user --transport ${m.transport} ${m.url} >>"$$BOOT_LOG" 2>&1`,
   );
   return "\n" + lines.join("\n") + "\n";
 }
@@ -179,21 +216,29 @@ export function renderStackBlock(stack: Stack): string {
         " && npm install -g pyright",
       ].join("\n");
     case "go":
+      // Force binaries into /usr/local/bin so the non-root `sandbox` user
+      // can read+exec them (default `go install` location is /root/go/bin
+      // which lives under root-only mode 700).
       return [
         "# Go gopls (gopls-lsp plugin)",
         "RUN apt-get update \\",
         " && apt-get install -y --no-install-recommends golang-go \\",
         " && rm -rf /var/lib/apt/lists/* \\",
-        " && go install golang.org/x/tools/gopls@latest",
+        " && GOBIN=/usr/local/bin go install golang.org/x/tools/gopls@latest \\",
+        " && chmod a+rx /usr/local/bin/gopls",
       ].join("\n");
     case "rust":
+      // rustup-init writes to /root/.cargo (mode 700). Copy the binary the
+      // plugin actually needs into /usr/local/bin so `sandbox` can use it.
       return [
         "# Rust rust-analyzer (rust-analyzer-lsp plugin)",
         "RUN apt-get update \\",
         " && apt-get install -y --no-install-recommends rustup \\",
         " && rm -rf /var/lib/apt/lists/* \\",
-        " && rustup-init -y --default-toolchain stable \\",
-        " && /root/.cargo/bin/rustup component add rust-analyzer",
+        " && rustup-init -y --default-toolchain stable --no-modify-path \\",
+        " && /root/.cargo/bin/rustup component add rust-analyzer \\",
+        " && cp /root/.cargo/bin/rust-analyzer /usr/local/bin/rust-analyzer \\",
+        " && chmod a+rx /usr/local/bin/rust-analyzer",
       ].join("\n");
   }
 }
@@ -239,16 +284,18 @@ export async function renderAll(
     overrideDockerfile,
   );
 
+  const projectSlug = computeProjectSlug(config);
   const overrideCompose = await renderTemplate(
     TEMPLATE_FILES.overrideCompose.template,
     {
-      volumesBlock: renderVolumesBlock(config),
+      volumesBlock: renderVolumesBlock(config, projectSlug),
       additionalDirsBlock: renderAdditionalDirsBlock(config),
       enabledPluginsBlock: renderEnabledPluginsBlock(config),
       marketplacesBlock: renderMarketplacesBlock(config),
       pluginLoopBlock: renderPluginLoopBlock(config),
       mcpsBlock: renderMcpsBlock(config),
       marker: config.marker,
+      projectSlug,
     },
   );
   await writeRendered(

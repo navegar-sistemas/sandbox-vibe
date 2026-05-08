@@ -8,9 +8,15 @@ ignored:
   # Debian-slim's APT cache; pinning every apt-get install would require
   # a coordinated upgrade workflow that is not justified for a template
   # whose explicit purpose is to be cloned, customized, and re-built
-  # frequently. This is the only ignored rule; all others are enforced
-  # at warning severity or above.
+  # frequently.
   - DL3008
+  # DL3007 (use of `:latest` tag): not enforced for the override layer.
+  # `Dockerfile.sandbox.override.example` starts with `FROM
+  # vibe-sandbox-base:latest`, where `vibe-sandbox-base` is a tag that
+  # this very template produces locally during `docker compose build`.
+  # It is not a public registry image, so pinning a digest is neither
+  # possible (the digest changes on every rebuild) nor useful.
+  - DL3007
 
 override:
   warning:

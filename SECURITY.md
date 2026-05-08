@@ -5,7 +5,7 @@
 `vibe-sandbox` is a template, not a long-running service. The supported version is whatever is on the `main` branch and the most recent tagged release. Older tags are not actively maintained — please update to the latest before reporting an issue.
 
 | Version | Supported |
-|---|---|
+| --- | --- |
 | `main` (HEAD) | Yes |
 | Latest tagged release | Yes |
 | Previous tags | No — please upgrade |

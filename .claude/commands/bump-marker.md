@@ -34,7 +34,7 @@ You are bumping the bootstrap marker in `docker-compose.override.example.yml` so
 7. **Reminders**
    Print a final block:
 
-   ```
+   ```text
    Marker bumped: vN -> v(N+1).
    Effects:
      - Sandboxes built before this change will re-bootstrap on next run

@@ -30,6 +30,7 @@ ${volumesBlock}
         if [ ! -f ~/.claude/.${marker} ]; then
           BOOT_LOG=/tmp/sandbox-bootstrap.log
           : > "$$BOOT_LOG"
+          chmod 600 "$$BOOT_LOG"
           echo "[sandbox] First run: installing marketplaces, plugins and MCPs..."
 
 ${marketplacesBlock}
@@ -37,11 +38,11 @@ ${marketplacesBlock}
           for p in \
 ${pluginLoopBlock}; do
             echo "[sandbox] install: $$p"
-            claude plugin install "$$p" 2>&1 | tee -a "$$BOOT_LOG" | tail -1
+            claude plugin install "$$p" >>"$$BOOT_LOG" 2>&1
           done
 ${mcpsBlock}
           touch ~/.claude/.${marker}
-          echo "[sandbox] Bootstrap done. Log at $$BOOT_LOG"
+          echo "[sandbox] Bootstrap done. Log at $$BOOT_LOG (chmod 600)."
         fi
 
         if [ -t 0 ]; then
@@ -52,4 +53,4 @@ ${mcpsBlock}
     command: []
 
 volumes:
-  sandbox-home:
+  ${projectSlug}-sandbox-home:

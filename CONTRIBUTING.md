@@ -21,6 +21,7 @@ Thanks for considering a contribution. This template stays small on purpose — 
 1. Fork the repo and create a feature branch from `main`.
 2. Make focused changes. One PR = one logical change. Splitting into smaller PRs is almost always better than bundling.
 3. Ensure the CI workflow passes locally before pushing:
+
    ```bash
    docker compose -f docker-compose.sandbox.yml config
    hadolint Dockerfile.sandbox Dockerfile.sandbox.override.example
@@ -28,6 +29,7 @@ Thanks for considering a contribution. This template stays small on purpose — 
    gitleaks detect --source . --no-git
    docker compose -f docker-compose.sandbox.yml build
    ```
+
 4. Update the README, CHANGELOG, and any relevant docs in the same PR. Documentation is part of the change, not a follow-up.
 5. Open the PR using the [pull request template](.github/PULL_REQUEST_TEMPLATE.md). Fill in every section honestly.
 6. CI must pass. A maintainer will review.
@@ -36,7 +38,7 @@ Thanks for considering a contribution. This template stays small on purpose — 
 
 This repo uses [Conventional Commits 1.0.0](https://www.conventionalcommits.org/). Format:
 
-```
+```text
 <type>(<optional scope>): <short imperative summary>
 
 <optional body explaining why, not what>
@@ -47,7 +49,7 @@ This repo uses [Conventional Commits 1.0.0](https://www.conventionalcommits.org/
 **Types we use:**
 
 | Type | When to use |
-|---|---|
+| --- | --- |
 | `feat` | New capability for users of the template (new option, new variable, new optional block) |
 | `fix` | Bug fix (compose syntax, broken bootstrap, security regression) |
 | `docs` | README, CONTRIBUTING, CHANGELOG, code comments |
@@ -58,7 +60,7 @@ This repo uses [Conventional Commits 1.0.0](https://www.conventionalcommits.org/
 
 **Examples:**
 
-```
+```text
 feat(override): add optional Bun runtime block
 fix(bootstrap): escape $$BOOT_LOG so compose stops warning about empty var
 docs(readme): document marker bumping for plugin list changes

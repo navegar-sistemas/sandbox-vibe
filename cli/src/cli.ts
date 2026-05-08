@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { bumpMarker } from "./commands/bumpMarker.js";
@@ -85,14 +86,20 @@ try {
 }
 
 function describeError(err: unknown): string {
+  let raw: string;
   if (err instanceof Error) {
     // ExecaError exposes `shortMessage` (command + reason, without stdout/
     // stderr blocks). Prefer it; full `message` can be hundreds of lines.
     const maybeExeca = err as { shortMessage?: unknown };
-    if (typeof maybeExeca.shortMessage === "string") {
-      return maybeExeca.shortMessage;
-    }
-    return err.message;
+    raw =
+      typeof maybeExeca.shortMessage === "string"
+        ? maybeExeca.shortMessage
+        : err.message;
+  } else {
+    raw = `Unknown error: ${String(err)}`;
   }
-  return `Unknown error: ${String(err)}`;
+  // Replace the user's home directory with `~` so error output dumped
+  // into shared logs / CI does not leak the absolute filesystem layout.
+  const home = homedir();
+  return home.length > 0 ? raw.replaceAll(home, "~") : raw;
 }

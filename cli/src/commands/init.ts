@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, join, resolve } from "node:path";
 import {
   type Config,
@@ -6,6 +14,10 @@ import {
   DEFAULT_PLUGINS,
   DEFAULT_RESOURCES,
   saveConfig,
+  validateContainerPath,
+  validateHostPath,
+  validateMcpName,
+  validateMcpUrl,
 } from "../config.js";
 import { log } from "../log.js";
 import {
@@ -15,6 +27,7 @@ import {
 } from "../paths.js";
 import { checkbox, confirm, input, select } from "../prompts.js";
 import { computeMarker, renderAll } from "../render.js";
+import { isSensitivePath } from "../sensitive-paths.js";
 
 const STACK_CHOICES = [
   { name: "none", value: "none" as const },
@@ -24,6 +37,16 @@ const STACK_CHOICES = [
   { name: "go (gopls)", value: "go" as const },
   { name: "rust (rust-analyzer)", value: "rust" as const },
 ];
+
+async function confirmSensitiveMount(absolutePath: string): Promise<boolean> {
+  log(
+    `WARNING: '${absolutePath}' looks like a system or credentials path. Mounting it exposes its contents to the Claude agent inside the container.`,
+  );
+  return confirm({
+    message: "Mount this path anyway?",
+    default: false,
+  });
+}
 
 export type InitOptions = {
   force?: boolean;
@@ -56,7 +79,26 @@ export async function init(opts: InitOptions = {}): Promise<void> {
   config.marker = computeMarker(config);
 
   const destDir = vibeSandboxPath(cwd);
-  // mkdirSync with `recursive: true` is idempotent — no need for an existsSync guard.
+  // Refuse to write through a symlinked .vibe-sandbox/. mkdir { recursive }
+  // would silently no-op when the path exists, and the subsequent writeFile
+  // calls would then follow the symlink (e.g. into /etc) and clobber host
+  // files. lstat (not stat) inspects the link itself.
+  try {
+    if (lstatSync(destDir).isSymbolicLink()) {
+      throw new Error(
+        `${destDir} is a symbolic link; refusing to follow. Replace it with a regular directory and re-run.`,
+      );
+    }
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      err.message.startsWith(`${destDir} is a symbolic link`)
+    ) {
+      throw err;
+    }
+    // Any other lstat error (typically ENOENT) is fine — mkdirSync below
+    // will create the directory.
+  }
   mkdirSync(destDir, { recursive: true });
   await renderAll(destDir, config);
   saveConfig(destDir, config);
@@ -84,15 +126,10 @@ function buildDefaultConfig(cwd: string): Config {
 }
 
 async function runWizard(cwd: string): Promise<Config> {
-  const workspacePath = await input({
-    message: "Workspace path (mounted as /workspace)",
-    default: cwd,
-    validate: (value) => {
-      const absolute = resolve(value);
-      if (!existsSync(absolute)) return `Path does not exist: ${absolute}`;
-      return true;
-    },
-  });
+  const workspacePath = await promptHostPath(
+    "Workspace path (mounted as /workspace)",
+    cwd,
+  );
 
   const additionalMounts = await promptAdditionalMounts();
 
@@ -123,7 +160,7 @@ async function runWizard(cwd: string): Promise<Config> {
 
   return {
     schemaVersion: 1,
-    workspacePath: resolve(workspacePath),
+    workspacePath,
     additionalMounts,
     resources,
     stack,
@@ -134,6 +171,45 @@ async function runWizard(cwd: string): Promise<Config> {
   };
 }
 
+async function promptHostPath(
+  message: string,
+  defaultValue?: string,
+): Promise<string> {
+  while (true) {
+    const raw = await input({
+      message,
+      default: defaultValue,
+      validate: (value) => {
+        const absolute = resolve(value);
+        const formatCheck = validateHostPath(absolute);
+        if (formatCheck !== true) return formatCheck;
+        if (!existsSync(absolute)) return `Path does not exist: ${absolute}`;
+        return true;
+      },
+    });
+    const absolute = resolve(raw);
+    // Resolve symlinks before the sensitive-path check so an attacker
+    // cannot bypass it with `~/innocent-link -> /etc`. Docker mounts the
+    // realpath anyway, so storing the resolved path keeps config and
+    // runtime behaviour aligned.
+    let real: string;
+    try {
+      real = realpathSync(absolute);
+    } catch {
+      log(`Cannot resolve real path for ${absolute}; please pick another.`);
+      continue;
+    }
+    if (isSensitivePath(real)) {
+      const ok = await confirmSensitiveMount(real);
+      if (!ok) {
+        log("Aborted mount; please pick another path.");
+        continue;
+      }
+    }
+    return real;
+  }
+}
+
 async function promptAdditionalMounts(): Promise<Config["additionalMounts"]> {
   const mounts: Config["additionalMounts"] = [];
   let addMore = await confirm({
@@ -141,24 +217,18 @@ async function promptAdditionalMounts(): Promise<Config["additionalMounts"]> {
     default: false,
   });
   while (addMore) {
-    const hostPath = await input({
-      message: "Host path (absolute)",
-      validate: (value) => {
-        const absolute = resolve(value);
-        if (!existsSync(absolute)) return `Path does not exist: ${absolute}`;
-        return true;
-      },
-    });
-    const defaultContainerPath = `/workspace/${basename(resolve(hostPath))}`;
+    const hostPath = await promptHostPath("Host path (absolute)");
+    const defaultContainerPath = `/workspace/${basename(hostPath)}`;
     const containerPath = await input({
       message: "Container path",
       default: defaultContainerPath,
+      validate: (value) => validateContainerPath(value),
     });
     const readonly = await confirm({
       message: "Read-only?",
       default: false,
     });
-    mounts.push({ hostPath: resolve(hostPath), containerPath, readonly });
+    mounts.push({ hostPath, containerPath, readonly });
     addMore = await confirm({
       message: "Add another mount?",
       default: false,
@@ -180,11 +250,13 @@ async function promptMcps(): Promise<Config["mcps"]> {
     const name = await input({
       message: "MCP name",
       default: "context7",
+      validate: (value) => validateMcpName(value),
     });
     const url = await input({
       message: "MCP URL",
       default:
         name === "context7" ? "https://mcp.context7.com/mcp" : "",
+      validate: (value) => validateMcpUrl(value),
     });
     mcps.push({ name, transport: "http", url });
     more = await confirm({
@@ -241,13 +313,33 @@ async function maybeUpdateGitignore(cwd: string): Promise<void> {
   const gitignorePath = join(cwd, ".gitignore");
   const entry = `/${VIBE_SANDBOX_DIR}/`;
 
-  if (!existsSync(gitignorePath)) {
+  // lstat (not stat) so we see the symlink itself, not its target.
+  // Refusing to follow a symlink prevents an attacker who controls the
+  // working directory (e.g. a malicious git checkout) from redirecting
+  // our writeFile into /etc/hosts or any other host file.
+  let isSymlink = false;
+  let exists = false;
+  try {
+    const st = lstatSync(gitignorePath);
+    exists = true;
+    isSymlink = st.isSymbolicLink();
+  } catch {
+    // ENOENT or other stat error: treat as "does not exist".
+  }
+
+  if (isSymlink) {
+    throw new Error(
+      `.gitignore at ${gitignorePath} is a symbolic link; refusing to follow. Replace it with a regular file and re-run.`,
+    );
+  }
+
+  if (!exists) {
     const create = await confirm({
       message: `No .gitignore found. Create one with '${entry}'?`,
       default: true,
     });
     if (create) {
-      writeFileSync(gitignorePath, entry + "\n", "utf-8");
+      writeGitignoreSafely(gitignorePath, entry + "\n");
       log("Created .gitignore.");
     }
     return;
@@ -263,7 +355,23 @@ async function maybeUpdateGitignore(cwd: string): Promise<void> {
   });
   if (add) {
     const trailing = content.endsWith("\n") ? "" : "\n";
-    writeFileSync(gitignorePath, content + trailing + entry + "\n", "utf-8");
+    writeGitignoreSafely(gitignorePath, content + trailing + entry + "\n");
     log("Updated .gitignore.");
   }
 }
+
+// Closes the TOCTTOU window between the earlier `lstatSync` check and the
+// actual write: an attacker who creates a symlink at `gitignorePath`
+// during that gap would otherwise see writeFileSync follow the link.
+// `unlinkSync` removes a symlink without dereferencing it, and the
+// subsequent `writeFileSync` creates a fresh regular file.
+function writeGitignoreSafely(gitignorePath: string, content: string): void {
+  try {
+    unlinkSync(gitignorePath);
+  } catch {
+    // ENOENT or any other condition where unlink is a no-op; writeFileSync
+    // below will surface a real failure.
+  }
+  writeFileSync(gitignorePath, content, "utf-8");
+}
+

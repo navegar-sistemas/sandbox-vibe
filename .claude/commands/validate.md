@@ -15,11 +15,13 @@ For each step: announce the command, run it, show its exit code, and keep the la
 
 2. **Compose merge — base + override.example**
    Copy `docker-compose.override.example.yml` to a temp file, merge-validate it, then remove the temp:
-   ```
+
+   ```bash
    cp docker-compose.override.example.yml /tmp/vibe-sandbox-validate-override.yml
    docker compose -f docker-compose.sandbox.yml -f /tmp/vibe-sandbox-validate-override.yml config --quiet
    rm /tmp/vibe-sandbox-validate-override.yml
    ```
+
    Any "variable is not set" warning is a defect (typically a `$VAR` in the entrypoint not escaped as `$$VAR`); the step must be marked FAIL when such a warning appears, regardless of compose's exit code. The repository treats warnings as defects of the same severity as errors.
 
 3. **Hadolint — Dockerfile.sandbox**
@@ -39,7 +41,7 @@ For each step: announce the command, run it, show its exit code, and keep the la
 If `command -v <tool>` returns nothing, mark the step `TOOL MISSING` and tell the user to install it:
 
 | Tool | macOS install |
-|---|---|
+| --- | --- |
 | hadolint | `brew install hadolint` |
 | markdownlint-cli2 | `brew install markdownlint-cli2` |
 | gitleaks | `brew install gitleaks` |
@@ -49,7 +51,7 @@ If `command -v <tool>` returns nothing, mark the step `TOOL MISSING` and tell th
 
 ## Final summary (always print)
 
-```
+```text
 | # | Step                                  | Status     |
 |---|---------------------------------------|------------|
 | 1 | Compose base                          | PASS / FAIL / TOOL MISSING |
